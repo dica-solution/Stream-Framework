@@ -6,7 +6,7 @@ import uuid
 import six
 
 
-MAX_AGGREGATED_ACTIVITIES_LENGTH = 15
+MAX_AGGREGATED_ACTIVITIES_LENGTH = 30
 
 
 class BaseActivity(object):
