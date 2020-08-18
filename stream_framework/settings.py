@@ -28,7 +28,7 @@ def import_global_module(module, current_locals, current_globals, exceptions=Non
             for k in objects:
                 if k and k[0] != '_':
                     current_globals[k] = getattr(module, k)
-        except exceptions as e:
+        except Exception as e:
             return e
     finally:
         del current_globals, current_locals

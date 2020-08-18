@@ -20,7 +20,7 @@ STREAM_CASSANDRA_READ_RETRY_ATTEMPTS = 1
 STREAM_CASSANDRA_WRITE_RETRY_ATTEMPTS = 1
 
 CASSANDRA_DRIVER_KWARGS = {
-    'protocol_version': 2
+    'protocol_version': 4
 }
 
 STREAM_METRIC_CLASS = 'stream_framework.metrics.base.Metrics'

@@ -1,9 +1,12 @@
 import copy
 import random
 
+from django.dispatch import Signal
+
 from stream_framework.serializers.base import BaseSerializer
-from stream_framework.serializers.simple_timeline_serializer import \
-    SimpleTimelineSerializer
+from stream_framework.serializers.simple_timeline_serializer import (
+    SimpleTimelineSerializer,
+)
 from stream_framework.storage.base import BaseActivityStorage, BaseTimelineStorage
 from stream_framework.activity import Activity
 from stream_framework.utils.validate import validate_list_of_strict
@@ -11,10 +14,12 @@ from stream_framework.tests.utils import FakeActivity
 
 import six
 
+on_update_feed = Signal(providing_args=["new", "deleted"])
+
 
 class BaseFeed(object):
 
-    '''
+    """
     The feed class allows you to add and remove activities from a feed.
     Please find below a quick usage example.
 
@@ -83,9 +88,10 @@ class BaseFeed(object):
     gets the first 10 activities from the timeline_storage, if the results are not complete activities then
     the BaseFeed will hydrate them via the activity_storage
 
-    '''
+    """
+
     # : the format of the key used when storing the data
-    key_format = 'feed_%(user_id)s'
+    key_format = "feed_%(user_id)s"
 
     # : the max length after which we start trimming
     max_length = 100
@@ -112,12 +118,12 @@ class BaseFeed(object):
     ordering_supported = False
 
     def __init__(self, user_id):
-        '''
+        """
         :param user_id: the id of the user who's feed we're working on
-        '''
+        """
         self.user_id = user_id
         self.key_format = self.key_format
-        self.key = self.key_format % {'user_id': self.user_id}
+        self.key = self.key_format % {"user_id": self.user_id}
 
         self.timeline_storage = self.get_timeline_storage()
         self.activity_storage = self.get_activity_storage()
@@ -129,62 +135,62 @@ class BaseFeed(object):
 
     @classmethod
     def get_timeline_storage_options(cls):
-        '''
+        """
         Returns the options for the timeline storage
-        '''
+        """
         options = {}
-        options['serializer_class'] = cls.timeline_serializer
-        options['activity_class'] = cls.activity_class
+        options["serializer_class"] = cls.timeline_serializer
+        options["activity_class"] = cls.activity_class
         return options
 
     @classmethod
     def get_timeline_storage(cls):
-        '''
+        """
         Returns an instance of the timeline storage
-        '''
+        """
         options = cls.get_timeline_storage_options()
         timeline_storage = cls.timeline_storage_class(**options)
         return timeline_storage
 
     @classmethod
     def get_activity_storage(cls):
-        '''
+        """
         Returns an instance of the activity storage
-        '''
+        """
         options = {}
-        options['serializer_class'] = cls.activity_serializer
-        options['activity_class'] = cls.activity_class
+        options["serializer_class"] = cls.activity_serializer
+        options["activity_class"] = cls.activity_class
         if cls.activity_storage_class is not None:
             activity_storage = cls.activity_storage_class(**options)
             return activity_storage
 
     @classmethod
     def insert_activities(cls, activities, **kwargs):
-        '''
+        """
         Inserts an activity to the activity storage
 
         :param activity: the activity class
-        '''
+        """
         activity_storage = cls.get_activity_storage()
         if activity_storage:
             activity_storage.add_many(activities)
 
     @classmethod
     def insert_activity(cls, activity, **kwargs):
-        '''
+        """
         Inserts an activity to the activity storage
 
         :param activity: the activity class
-        '''
+        """
         cls.insert_activities([activity])
 
     @classmethod
     def remove_activity(cls, activity, **kwargs):
-        '''
+        """
         Removes an activity from the activity storage
 
         :param activity: the activity class or an activity id
-        '''
+        """
         activity_storage = cls.get_activity_storage()
         activity_storage.remove(activity)
 
@@ -197,17 +203,17 @@ class BaseFeed(object):
         return self.add_many([activity], *args, **kwargs)
 
     def add_many(self, activities, batch_interface=None, trim=True, *args, **kwargs):
-        '''
+        """
         Add many activities
 
         :param activities: a list of activities
         :param batch_interface: the batch interface
-        '''
-        validate_list_of_strict(
-            activities, (self.activity_class, FakeActivity))
+        """
+        validate_list_of_strict(activities, (self.activity_class, FakeActivity))
 
         add_count = self.timeline_storage.add_many(
-            self.key, activities, batch_interface=batch_interface, *args, **kwargs)
+            self.key, activities, batch_interface=batch_interface, *args, **kwargs
+        )
 
         # trim the feed sometimes
         if trim and random.random() <= self.trim_chance:
@@ -218,47 +224,52 @@ class BaseFeed(object):
     def remove(self, activity_id, *args, **kwargs):
         return self.remove_many([activity_id], *args, **kwargs)
 
-    def remove_many(self, activity_ids, batch_interface=None, trim=True, *args, **kwargs):
-        '''
+    def remove_many(
+        self, activity_ids, batch_interface=None, trim=True, *args, **kwargs
+    ):
+        """
         Remove many activities
 
         :param activity_ids: a list of activities or activity ids
-        '''
+        """
         del_count = self.timeline_storage.remove_many(
-            self.key, activity_ids, batch_interface=None, *args, **kwargs)
+            self.key, activity_ids, batch_interface=None, *args, **kwargs
+        )
         # trim the feed sometimes
         if trim and random.random() <= self.trim_chance:
             self.trim()
         self.on_update_feed(new=[], deleted=activity_ids)
         return del_count
 
-    def on_update_feed(self, new, deleted):
-        '''
+    def on_update_feed(self, new=[], deleted=[]):
+        """
         A hook called when activities area created or removed from the feed
-        '''
-        pass
+        """
+        on_update_feed.send(
+            sender=self, new=new, deleted=deleted,
+        )
 
     def trim(self, length=None):
-        '''
+        """
         Trims the feed to the length specified
 
         :param length: the length to which to trim the feed, defaults to self.max_length
-        '''
+        """
         length = length or self.max_length
         self.timeline_storage.trim(self.key, length)
 
     def count(self):
-        '''
+        """
         Count the number of items in the feed
-        '''
+        """
         return self.timeline_storage.count(self.key)
 
     __len__ = count
 
     def delete(self):
-        '''
+        """
         Delete the entire feed
-        '''
+        """
         return self.timeline_storage.delete(self.key)
 
     @classmethod
@@ -269,7 +280,7 @@ class BaseFeed(object):
         timeline_storage.flush()
 
     def __iter__(self):
-        raise TypeError('Iteration over non sliced feeds is not supported')
+        raise TypeError("Iteration over non sliced feeds is not supported")
 
     def __getitem__(self, k):
         """
@@ -278,10 +289,11 @@ class BaseFeed(object):
         """
         if not isinstance(k, (slice, six.integer_types)):
             raise TypeError
-        assert ((not isinstance(k, slice) and (k >= 0))
-                or (isinstance(k, slice) and (k.start is None or k.start >= 0)
-                    and (k.stop is None or k.stop >= 0))), \
-            "Negative indexing is not supported."
+        assert (not isinstance(k, slice) and (k >= 0)) or (
+            isinstance(k, slice)
+            and (k.start is None or k.start >= 0)
+            and (k.stop is None or k.stop >= 0)
+        ), "Negative indexing is not supported."
 
         if isinstance(k, slice):
             start = k.start
@@ -301,8 +313,7 @@ class BaseFeed(object):
 
         # We need check to see if we need to populate more of the cache.
         try:
-            results = self.get_activity_slice(
-                start, bound)
+            results = self.get_activity_slice(start, bound)
         except StopIteration:
             # There's nothing left, even though the bound is higher.
             results = None
@@ -310,17 +321,17 @@ class BaseFeed(object):
         return results
 
     def index_of(self, activity_id):
-        '''
+        """
         Returns the index of the activity id
 
         :param activity_id: the activity id
-        '''
+        """
         return self.timeline_storage.index_of(self.key, activity_id)
 
     def hydrate_activities(self, activities):
-        '''
+        """
         hydrates the activities using the activity_storage
-        '''
+        """
         activity_ids = []
         for activity in activities:
             activity_ids += activity._activity_ids
@@ -329,37 +340,41 @@ class BaseFeed(object):
         return [activity.get_hydrated(activity_data) for activity in activities]
 
     def needs_hydration(self, activities):
-        '''
+        """
         checks if the activities are dehydrated
-        '''
+        """
         for activity in activities:
-            if hasattr(activity, 'dehydrated') and activity.dehydrated:
+            if hasattr(activity, "dehydrated") and activity.dehydrated:
                 return True
         return False
 
     def get_activity_slice(self, start=None, stop=None, rehydrate=True):
-        '''
+        """
         Gets activity_ids from timeline_storage and then loads the
         actual data querying the activity_storage
-        '''
+        """
         activities = self.timeline_storage.get_slice(
-            self.key, start, stop, filter_kwargs=self._filter_kwargs,
-            ordering_args=self._ordering_args)
+            self.key,
+            start,
+            stop,
+            filter_kwargs=self._filter_kwargs,
+            ordering_args=self._ordering_args,
+        )
         if self.needs_hydration(activities) and rehydrate:
             activities = self.hydrate_activities(activities)
         return activities
 
     def _clone(self):
-        '''
+        """
         Copy the feed instance
-        '''
+        """
         feed_copy = copy.copy(self)
         filter_kwargs = copy.copy(self._filter_kwargs)
         feed_copy._filter_kwargs = filter_kwargs
         return feed_copy
 
     def filter(self, **kwargs):
-        '''
+        """
         Filter based on the kwargs given, uses django orm like syntax
 
         **Example** ::
@@ -369,16 +384,16 @@ class BaseFeed(object):
             # the same statement but in one step
             feed = feed.filter(activity_id__gte=100, activity_id__lte=200)
 
-        '''
+        """
         new = self._clone()
         new._filter_kwargs.update(kwargs)
         return new
 
     def order_by(self, *ordering_args):
-        '''
+        """
         Change default ordering
 
-        '''
+        """
         new = self._clone()
         new._ordering_args = ordering_args
         return new
@@ -386,9 +401,10 @@ class BaseFeed(object):
 
 class UserBaseFeed(BaseFeed):
 
-    '''
+    """
     Implementation of the base feed with a different
     Key format and a really large max_length
-    '''
-    key_format = 'user_feed:%(user_id)s'
+    """
+
+    key_format = "user_feed:%(user_id)s"
     max_length = 10 ** 6

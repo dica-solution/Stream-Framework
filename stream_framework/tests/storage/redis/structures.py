@@ -163,11 +163,11 @@ class BaseRedisSortedSetTest(BaseRedisStructureTestCase):
         key = 'test'
         # start out fresh
         redis.delete(key)
-        redis.zadd(key, 1, 'a')
-        redis.zadd(key, 2, 'b')
-        redis.zadd(key, 3, 'c')
-        redis.zadd(key, 4, 'd')
-        redis.zadd(key, 5, 'e')
+        redis.zadd(key, mapping={'a': 1})
+        redis.zadd(key, mapping={'b': 2})
+        redis.zadd(key, mapping={'c': 3})
+        redis.zadd(key, mapping={'d': 4})
+        redis.zadd(key, mapping={'e': 5})
         expected_results = [('a', 1.0), ('b', 2.0), ('c', 3.0), (
             'd', 4.0), ('e', 5.0)]
         results = redis.zrange(key, 0, -1, withscores=True)

@@ -1,4 +1,6 @@
 import datetime
+from unittest.mock import Mock
+
 from stream_framework.feed_managers.base import Manager
 from stream_framework.tests.utils import Pin
 from stream_framework.tests.utils import FakeActivity
@@ -8,6 +10,9 @@ import unittest
 import copy
 from functools import partial
 
+class PicklableMock(Mock):
+    def __reduce__(self):
+        return (Mock, ())
 
 def implementation(meth):
     def wrapped_test(self, *args, **kwargs):
@@ -39,7 +44,7 @@ class BaseManagerTest(unittest.TestCase):
         assert self.manager.get_user_feed(
             self.actor_id).count() == 0, 'the test feed is not empty'
 
-        with patch.object(self.manager, 'get_user_follower_ids', return_value={None: [1]}) as get_user_follower_ids:
+        with patch.object(self.manager, 'get_user_follower_ids', new_callable=PicklableMock, return_value={None: [1]}) as get_user_follower_ids:
             self.manager.add_user_activity(self.actor_id, self.activity)
             get_user_follower_ids.assert_called_with(user_id=self.actor_id)
 
@@ -52,7 +57,7 @@ class BaseManagerTest(unittest.TestCase):
         assert self.manager.get_user_feed(
             self.actor_id).count() == 0, 'the test feed is not empty'
 
-        with patch.object(self.manager, 'get_user_follower_ids', return_value={None: [1]}) as get_user_follower_ids:
+        with patch.object(self.manager, 'get_user_follower_ids', new_callable=PicklableMock,  return_value={None: [1]}) as get_user_follower_ids:
             activities = [self.activity]
             self.manager.batch_import(self.actor_id, activities, 10)
             get_user_follower_ids.assert_called_with(user_id=self.actor_id)
@@ -71,7 +76,7 @@ class BaseManagerTest(unittest.TestCase):
         # error
         activity = copy.deepcopy(self.activity)
         activity.actor_id = 10
-        with patch.object(self.manager, 'get_user_follower_ids', return_value={None: [1]}):
+        with patch.object(self.manager, 'get_user_follower_ids', new_callable=PicklableMock,  return_value={None: [1]}):
             batch = partial(
                 self.manager.batch_import, self.actor_id, [activity], 10)
             self.assertRaises(ValueError, batch)
@@ -82,12 +87,12 @@ class BaseManagerTest(unittest.TestCase):
         assert self.manager.get_user_feed(
             user_id).count() == 0, 'the test feed is not empty'
 
-        with patch.object(self.manager, 'get_user_follower_ids', return_value={None: [1]}) as get_user_follower_ids:
+        with patch.object(self.manager, 'get_user_follower_ids', new_callable=PicklableMock,  return_value={None: [1]}) as get_user_follower_ids:
             self.manager.add_user_activity(user_id, self.activity)
             get_user_follower_ids.assert_called_with(user_id=user_id)
         assert self.manager.get_user_feed(user_id).count() == 1
 
-        with patch.object(self.manager, 'get_user_follower_ids', return_value={None: [1]}) as get_user_follower_ids:
+        with patch.object(self.manager, 'get_user_follower_ids', new_callable=PicklableMock, return_value={None: [1]}) as get_user_follower_ids:
             self.manager.remove_user_activity(user_id, self.activity)
             get_user_follower_ids.assert_called_with(user_id=user_id)
         assert self.manager.get_user_feed(user_id).count() == 0
@@ -102,7 +107,7 @@ class BaseManagerTest(unittest.TestCase):
         for follower in followers.values():
             assert self.manager.get_user_feed(follower).count() == 0
 
-        with patch.object(self.manager, 'get_user_follower_ids', return_value=followers) as get_user_follower_ids:
+        with patch.object(self.manager, 'get_user_follower_ids',new_callable=PicklableMock,  return_value=followers) as get_user_follower_ids:
             self.manager.add_user_activity(user_id, self.activity)
             get_user_follower_ids.assert_called_with(user_id=user_id)
 
@@ -124,7 +129,7 @@ class BaseManagerTest(unittest.TestCase):
         control_activity = FakeActivity(
             target_user_id, LoveVerb, control_pin, 2, datetime.datetime.now(), {})
 
-        with patch.object(self.manager, 'get_user_follower_ids', return_value={}) as get_user_follower_ids:
+        with patch.object(self.manager, 'get_user_follower_ids', new_callable=PicklableMock,  return_value={}) as get_user_follower_ids:
             self.manager.add_user_activity(target2_user_id, control_activity)
             self.manager.add_user_activity(target_user_id, self.activity)
             get_user_follower_ids.assert_called_with(user_id=target_user_id)
@@ -146,7 +151,7 @@ class BaseManagerTest(unittest.TestCase):
             self.assertEqual(f.count(), 2)
 
         self.manager.unfollow_user(
-            follower_user_id, target_user_id, async=False)
+            follower_user_id, target_user_id, async_=False)
 
         # make sure only one activity was removed
         for f in self.manager.get_feeds(follower_user_id).values():
